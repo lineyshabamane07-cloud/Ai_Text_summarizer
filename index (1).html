@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SummarAI – Smart Text Summarizer</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Google Fonts: Space Grotesk (display) + Inter (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ── HEADER ── -->
+  <header class="site-header">
+    <div class="logo">
+      <span class="logo-icon">✦</span>
+      <span class="logo-text">SummarAI</span>
+    </div>
+    <p class="tagline">Paste any text. Get the point instantly.</p>
+  </header>
+
+  <!-- ── MAIN APP ── -->
+  <main class="app-container">
+
+    <!-- LEFT PANEL: Input -->
+    <section class="panel panel--input">
+      <label class="panel-label" for="inputText">Your Text</label>
+      <textarea
+        id="inputText"
+        class="text-area"
+        placeholder="Paste an article, essay, or any long text here (minimum 50 characters)…"
+        rows="14"
+      ></textarea>
+      <div class="char-counter">
+        <span id="charCount">0</span> characters
+      </div>
+    </section>
+
+    <!-- CENTER: Controls -->
+    <section class="controls">
+
+      <!-- Summary Style Picker -->
+      <div class="style-group">
+        <p class="style-label">Summary style</p>
+
+        <label class="style-option">
+          <input type="radio" name="summaryStyle" value="short" checked />
+          <span class="style-card">
+            <span class="style-icon">⚡</span>
+            <span class="style-name">Short</span>
+            <span class="style-desc">2–3 sentences</span>
+          </span>
+        </label>
+
+        <label class="style-option">
+          <input type="radio" name="summaryStyle" value="medium" />
+          <span class="style-card">
+            <span class="style-icon">📄</span>
+            <span class="style-name">Medium</span>
+            <span class="style-desc">One paragraph</span>
+          </span>
+        </label>
+
+        <label class="style-option">
+          <input type="radio" name="summaryStyle" value="bullets" />
+          <span class="style-card">
+            <span class="style-icon">📋</span>
+            <span class="style-name">Bullet Points</span>
+            <span class="style-desc">Key takeaways</span>
+          </span>
+        </label>
+      </div>
+
+      <!-- Summarize Button -->
+      <button id="summarizeBtn" class="btn-summarize" onclick="handleSummarize()">
+        <span class="btn-text">Summarize →</span>
+        <span class="btn-loader" hidden>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </span>
+      </button>
+
+      <!-- Clear Button -->
+      <button class="btn-clear" onclick="clearAll()">Clear all</button>
+
+    </section>
+
+    <!-- RIGHT PANEL: Output -->
+    <section class="panel panel--output">
+      <label class="panel-label">Summary</label>
+
+      <!-- Idle state (default) -->
+      <div id="outputIdle" class="output-idle">
+        <span class="idle-icon">✦</span>
+        <p>Your summary will appear here.</p>
+      </div>
+
+      <!-- Loading state -->
+      <div id="outputLoading" class="output-loading" hidden>
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Error state -->
+      <div id="outputError" class="output-error" hidden>
+        <span class="error-icon">⚠</span>
+        <p id="errorMessage">Something went wrong. Please try again.</p>
+      </div>
+
+      <!-- Result state -->
+      <div id="outputResult" class="output-result" hidden>
+        <p id="summaryText"></p>
+        <div class="result-actions">
+          <button class="btn-copy" onclick="copyResult()">⎘ Copy</button>
+          <span id="copyConfirm" class="copy-confirm" hidden>Copied!</span>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
