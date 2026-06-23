@@ -3,9 +3,7 @@
    ════════════════════════════════════════ */
 
 // ── CONFIG ──
-const API_KEY = process.env.GROQ_API_KEY;  // 🔑 Replace with your Groq key
-const API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL   = "llama-3.3-70b-versatile";
+const API_URL = "/api/summarize";
 
 // ── CHARACTER COUNTER ──
 const inputTextEl = document.getElementById("inputText");
@@ -73,12 +71,6 @@ async function handleSummarize() {
     return;
   }
 
-  // KEY NOT SET
-  if (API_KEY === "YOUR_GROQ_API_KEY_HERE") {
-    showWarning("Add your Groq API key on line 4 of app.js. Get a free key at console.groq.com");
-    return;
-  }
-
   // All good — remove any warning and start loading
  removeWarning();
  var style = document.querySelector('input[name="summaryStyle"]:checked').value;
@@ -104,31 +96,24 @@ async function handleSummarize() {
 
 // ── GROQ API CALL ──
 async function callGroqAPI(text, style) {
-  var res = await fetch(API_URL, {
+  const res = await fetch("/api/summarize", {
     method: "POST",
     headers: {
-      "Content-Type":  "application/json",
-      "Authorization": "Bearer " + API_KEY,
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model:       MODEL,
-      max_tokens:  1024,
-      temperature: 0.4,
-      messages:    buildMessages(text, style),
-    }),
+      text,
+      style
+    })
   });
 
+  const data = await res.json();
+
   if (!res.ok) {
-    var err = await res.json().catch(function() { return {}; });
-    var msg = (err.error && err.error.message) ? err.error.message : "";
-    if (res.status === 401) throw new Error("Invalid Groq API key. Check console.groq.com → API Keys.");
-    if (res.status === 429) throw new Error("Rate limit hit. Wait a moment and try again.");
-    if (res.status === 400) throw new Error("Bad request: " + (msg || "Check your input."));
-    throw new Error("API error " + res.status + (msg ? ": " + msg : ""));
+    throw new Error(data.error || "Request failed");
   }
 
-  var data = await res.json();
-  return data.choices[0].message.content.trim();
+  return data.summary;
 }
 
 // ── INLINE WARNING (below textarea, no output panel change) ──
