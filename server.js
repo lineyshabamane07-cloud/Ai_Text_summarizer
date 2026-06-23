@@ -1,37 +1,4 @@
-/* ════════════════════════════════════════
-   SummarAI – server.js  (Node.js + Express)
-   A simple backend server that:
-   1. Serves your HTML/CSS/JS files
-   2. Keeps your Groq API key SECRET
-   3. Forwards summarize requests to Groq
-   ════════════════════════════════════════
 
-   WHY a server?
-   ─────────────
-   If you put your API key in app.js,
-   anyone can open DevTools and steal it.
-   This server keeps the key on the backend
-   where users can never see it. ✅
-
-   HOW TO RUN:
-   ───────────
-   1. Install Node.js from https://nodejs.org
-   2. In your project folder, open terminal and run:
-        npm init -y
-        npm install express node-fetch dotenv
-   3. Create a .env file with:
-        GROQ_API_KEY=gsk_your_real_key_here
-   4. Start the server:
-        node server.js
-   5. Open http://localhost:3000 in your browser
-*/
-
-
-// ─────────────────────────────────────────
-// STEP 1 ▸ Load dependencies
-// ─────────────────────────────────────────
-
-// dotenv: reads your .env file so you can use process.env.GROQ_API_KEY
 require("dotenv").config();
 
 const express  = require("express");   // Web server framework
@@ -192,7 +159,7 @@ app.post("/api/summarize", async (req, res) => {
 // (important when you have multiple pages)
 // ─────────────────────────────────────────
 
-app.get("*", (req, res) => {
+app.get("/*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
