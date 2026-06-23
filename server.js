@@ -22,7 +22,7 @@ app.use(express.json());
 
 // Serve your static files (index.html, style.css, app.js)
 // from the same folder as this server.js
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname)));
 
 
 // ─────────────────────────────────────────
@@ -160,7 +160,7 @@ app.post("/api/summarize", async (req, res) => {
 // ─────────────────────────────────────────
 
 app.get("/*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 
