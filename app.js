@@ -62,9 +62,9 @@ async function handleSummarize() {
 
   // EMPTY — show warning below textarea, output stays idle, NO loading
   if (!userText) {
+    showWarning("Please paste some text to summarize.");
     return;
-  }
-
+}
   // TOO SHORT — same, no loading
   if (userText.length < 50) {
     showWarning("Text is too short — paste at least 50 characters.");
