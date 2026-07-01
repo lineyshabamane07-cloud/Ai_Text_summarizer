@@ -4,6 +4,16 @@ export default async function handler(req, res) {
   }
 
   const { text, style } = req.body;
+  const instructions = {
+  short:
+    "Summarize the following text in 2–3 concise sentences.",
+
+  medium:
+    "Summarize the following text in one paragraph (5–8 sentences).",
+
+  bullets:
+    "Summarize the following text as bullet points. Start every bullet with '• '. Include 4 to 7 bullet points."
+};
 
   if (!text || text.length < 50) {
     return res.status(400).json({
@@ -22,18 +32,19 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          {
-            role: "system",
-            content: "You are a professional text summarizer."
-          },
-          {
-            role: "user",
-            content: text
-          }
-        ]
-      })
-    }
-  );
+  {
+    role: "system",
+    content:
+      "You are a professional text summarizer. Respond only with the summary."
+  },
+  {
+    role: "user",
+    content:
+      (instructions[style] || instructions.short) +
+      "\n\nText:\n" +
+      text
+  }
+]
 
   const data = await response.json();
 
