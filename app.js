@@ -80,7 +80,9 @@ async function handleSummarize() {
   try{
   var summary = await callGroqAPI(userText, style);
 
-  document.getElementById("summaryText").textContent = summary;
+  const summaryEl = document.getElementById("summaryText");
+  summaryEl.textContent = summary;
+  summaryEl.style.whiteSpace = "pre-wrap";
   document.getElementById("copyConfirm").hidden = true;
 
   setButtonLoading(false);
