@@ -468,3 +468,21 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+/* ── Download Buttons ── */
+.btn-download {
+  background: rgba(124,92,252,0.08);
+  border: 1px solid var(--panel-border);
+  color: var(--text-label);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.btn-download:hover {
+  background: rgba(124,92,252,0.2);
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
