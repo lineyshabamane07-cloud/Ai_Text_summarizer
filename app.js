@@ -168,3 +168,130 @@ window.addEventListener("DOMContentLoaded", function () {
   showState("outputIdle");
   setButtonLoading(false);
 });
+// ── DOWNLOAD AS PDF ──
+function downloadAsPDF() {
+  const text = document.getElementById("summaryText").textContent;
+  if (!text) return;
+
+  const printWindow = window.open("", "_blank");
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>SummarAI – Summary</title>
+      <style>
+        body {
+          font-family: Georgia, serif;
+          max-width: 680px;
+          margin: 60px auto;
+          color: #1a1a1a;
+          line-height: 1.85;
+          font-size: 16px;
+        }
+        h1 {
+          font-family: sans-serif;
+          font-size: 20px;
+          font-weight: 700;
+          margin-bottom: 6px;
+        }
+        .meta {
+          font-size: 12px;
+          color: #888;
+          padding-bottom: 16px;
+          margin-bottom: 24px;
+          border-bottom: 1px solid #ddd;
+          font-family: sans-serif;
+        }
+        p  { margin-bottom: 14px; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 10px; }
+      </style>
+    </head>
+    <body>
+      <h1>SummarAI – Summary</h1>
+      <div class="meta">
+        Generated on ${new Date().toLocaleDateString("en-IN", {
+          year: "numeric", month: "long", day: "numeric"
+        })}
+      </div>
+      ${formatForHTML(text)}
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.onload = () => {
+    printWindow.focus();
+    printWindow.print();
+  };
+}
+
+// ── DOWNLOAD AS WORD (.docx) ──
+function downloadAsWord() {
+  const text = document.getElementById("summaryText").textContent;
+  if (!text) return;
+
+  // Load docx library from CDN on demand
+  const script = document.createElement("script");
+  script.src = "https://unpkg.com/docx@8.5.0/build/index.umd.js";
+  document.head.appendChild(script);
+
+  script.onload = () => {
+    const { Document, Paragraph, TextRun, HeadingLevel, Packer } = docx;
+
+    const lines = text.split("\n").filter(l => l.trim());
+
+    const contentParagraphs = lines.map(line => {
+      const isBullet = line.trim().startsWith("•");
+      const cleanLine = line.replace(/^•\s*/, "").trim();
+      return new Paragraph({
+        children: [new TextRun({ text: cleanLine, size: 24, font: "Georgia" })],
+        bullet: isBullet ? { level: 0 } : undefined,
+        spacing: { after: 160 }
+      });
+    });
+
+    const doc = new Document({
+      sections: [{
+        children: [
+          new Paragraph({
+            text: "SummarAI – Summary",
+            heading: HeadingLevel.HEADING_1,
+            spacing: { after: 120 }
+          }),
+          new Paragraph({
+            children: [new TextRun({
+              text: `Generated on ${new Date().toLocaleDateString("en-IN", {
+                year: "numeric", month: "long", day: "numeric"
+              })}`,
+              color: "888888",
+              size: 20
+            })],
+            spacing: { after: 320 }
+          }),
+          ...contentParagraphs
+        ]
+      }]
+    });
+
+    Packer.toBlob(doc).then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement("a");
+      a.href     = url;
+      a.download = "summary.docx";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  };
+}
+
+// ── HELPER: plain text → HTML for PDF ──
+function formatForHTML(text) {
+  const lines = text.split("\n").filter(l => l.trim());
+  const isBullets = lines.some(l => l.trim().startsWith("•"));
+
+  if (isBullets) {
+    const items = lines.map(l => `<li>${l.replace(/^•\s*/, "")}</li>`).join("");
+    return `<ul>${items}</ul>`;
+  }
+  return lines.map(l => `<p>${l}</p>`).join("");
+}
