@@ -168,61 +168,146 @@ window.addEventListener("DOMContentLoaded", function () {
   showState("outputIdle");
   setButtonLoading(false);
 });
-// ── DOWNLOAD AS PDF ──
+// ── DOWNLOAD AS REAL PDF (jsPDF) ──
 function downloadAsPDF() {
   const text = document.getElementById("summaryText").textContent;
   if (!text) return;
 
-  const printWindow = window.open("", "_blank");
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>SummarAI – Summary</title>
-      <style>
-        body {
-          font-family: Georgia, serif;
-          max-width: 680px;
-          margin: 60px auto;
-          color: #1a1a1a;
-          line-height: 1.85;
-          font-size: 16px;
-        }
-        h1 {
-          font-family: sans-serif;
-          font-size: 20px;
-          font-weight: 700;
-          margin-bottom: 6px;
-        }
-        .meta {
-          font-size: 12px;
-          color: #888;
-          padding-bottom: 16px;
-          margin-bottom: 24px;
-          border-bottom: 1px solid #ddd;
-          font-family: sans-serif;
-        }
-        p  { margin-bottom: 14px; }
-        ul { padding-left: 20px; }
-        li { margin-bottom: 10px; }
-      </style>
-    </head>
-    <body>
-      <h1>SummarAI – Summary</h1>
-      <div class="meta">
-        Generated on ${new Date().toLocaleDateString("en-IN", {
-          year: "numeric", month: "long", day: "numeric"
-        })}
-      </div>
-      ${formatForHTML(text)}
-    </body>
-    </html>
-  `);
-  printWindow.document.close();
-  printWindow.onload = () => {
-    printWindow.focus();
-    printWindow.print();
+  // Show a brief loading state on the button
+  const pdfBtn = document.querySelector('.btn-download');
+  pdfBtn.textContent = 'Generating…';
+  pdfBtn.disabled = true;
+
+  // Load jsPDF from CDN if not already loaded
+  if (window.jspdf) {
+    generatePDF(text, pdfBtn);
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  document.head.appendChild(script);
+
+  script.onload = () => generatePDF(text, pdfBtn);
+
+  script.onerror = () => {
+    pdfBtn.textContent = '↓ PDF';
+    pdfBtn.disabled = false;
+    alert('Failed to load PDF library. Check your internet connection.');
   };
+}
+
+function generatePDF(text, btn) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth   = doc.internal.pageSize.getWidth();
+  const pageHeight  = doc.internal.pageSize.getHeight();
+  const marginLeft  = 20;
+  const marginTop   = 20;
+  const marginRight = 20;
+  const maxWidth    = pageWidth - marginLeft - marginRight;
+  let cursorY       = marginTop;
+
+  // ── Header bar ──
+  doc.setFillColor(124, 92, 252);           // violet accent
+  doc.rect(0, 0, pageWidth, 14, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(255, 255, 255);
+  doc.text('SummarAI', marginLeft, 9.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Smart Text Summarizer', pageWidth - marginRight, 9.5, { align: 'right' });
+
+  cursorY = 28;
+
+  // ── Title ──
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(20, 20, 40);
+  doc.text('Summary', marginLeft, cursorY);
+  cursorY += 7;
+
+  // ── Date line ──
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(140, 140, 160);
+  const dateStr = new Date().toLocaleDateString('en-IN', {
+    year: 'numeric', month: 'long', day: 'numeric'
+  });
+  doc.text(`Generated on ${dateStr}`, marginLeft, cursorY);
+  cursorY += 3;
+
+  // ── Divider ──
+  doc.setDrawColor(220, 220, 235);
+  doc.setLineWidth(0.4);
+  doc.line(marginLeft, cursorY + 1, pageWidth - marginRight, cursorY + 1);
+  cursorY += 10;
+
+  // ── Body text ──
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(30, 30, 50);
+
+  const lines = text.split('\n').filter(l => l.trim());
+  const isBullets = lines.some(l => l.trim().startsWith('•'));
+
+  for (const line of lines) {
+    const cleanLine = line.replace(/^•\s*/, '').trim();
+    const prefix    = isBullets ? '•  ' : '';
+
+    // Word-wrap the line to fit page width
+    const wrapped = doc.splitTextToSize(prefix + cleanLine, maxWidth);
+
+    // Check if we need a new page
+    const blockHeight = wrapped.length * 7;
+    if (cursorY + blockHeight > pageHeight - 20) {
+      doc.addPage();
+      cursorY = marginTop;
+    }
+
+    // Draw bullet dot in accent color
+    if (isBullets) {
+      doc.setTextColor(124, 92, 252);
+      doc.text('•', marginLeft, cursorY);
+      doc.setTextColor(30, 30, 50);
+      // Indent the text after the bullet
+      const indentedLines = doc.splitTextToSize(cleanLine, maxWidth - 6);
+      doc.text(indentedLines, marginLeft + 6, cursorY);
+      cursorY += indentedLines.length * 7 + 3;
+    } else {
+      doc.text(wrapped, marginLeft, cursorY);
+      cursorY += wrapped.length * 7 + 4;
+    }
+  }
+
+  // ── Footer on every page ──
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(180, 180, 200);
+    doc.text(
+      `Page ${i} of ${totalPages}`,
+      pageWidth / 2,
+      pageHeight - 10,
+      { align: 'center' }
+    );
+    doc.text('Generated by SummarAI', marginLeft, pageHeight - 10);
+  }
+
+  // ── Save ──
+  doc.save('summary.pdf');
+
+  // Reset button
+  btn.textContent = '↓ PDF';
+  btn.disabled = false;
 }
 
 // ── DOWNLOAD AS WORD (.docx) ──
