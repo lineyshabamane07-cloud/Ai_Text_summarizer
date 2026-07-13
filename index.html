@@ -28,14 +28,34 @@
     <section class="panel panel--input">
       <label class="panel-label" for="inputText">Your Text</label>
       <textarea
-        id="inputText"
-        class="text-area"
-        placeholder="Paste an article, essay, or any long text here (minimum 50 characters)…"
-        rows="14"
-      ></textarea>
-      <div class="char-counter">
-        <span id="charCount">0</span> characters
-      </div>
+id="inputText"
+class="text-area"
+placeholder="Paste an article, essay, or any long text here..."
+rows="14"
+></textarea>
+
+<div class="upload-container">
+
+<input
+type="file"
+id="documentInput"
+accept=".pdf,.doc,.docx,.txt"
+hidden
+/>
+
+<button
+class="btn-upload"
+onclick="document.getElementById('documentInput').click()">
+Upload Document
+</button>
+
+<span id="fileName">No file selected</span>
+
+</div>
+
+<div class="char-counter">
+<span id="charCount">0</span> characters
+</div>
     </section>
 
     <!-- CENTER: Controls -->
@@ -123,6 +143,10 @@
     </section>
 
   </main>
-  <script src="app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.7.2/mammoth.browser.min.js"></script>
+
+<script src="app.js"></script>
 </body>
 </html>
