@@ -1,42 +1,35 @@
 /* ════════════════════════════════════════
-   SummarAI – app.js  (Groq Edition - FIXED)
+   SummarAI – app.js
+   Includes: Summarizer + Chat with session memory
    ════════════════════════════════════════ */
 
 // ── CONFIG ──
 const API_URL = "/api/summarize";
 
-// ── CHARACTER COUNTER ──
+// ════════════════════════════════════════
+// SECTION 1 — SUMMARIZER (unchanged logic)
+// ════════════════════════════════════════
+
 const inputTextEl = document.getElementById("inputText");
 const charCountEl = document.getElementById("charCount");
-// Upload Elements
-const documentInput = document.getElementById("documentInput");
-const fileName = document.getElementById("fileName");
 
 inputTextEl.addEventListener("input", function () {
   charCountEl.textContent = inputTextEl.value.length;
 });
-// Upload Listener
-if (documentInput) {
-  documentInput.addEventListener("change", uploadDocument);
-}
 
-// ── BUILD PROMPT ──
 function buildMessages(text, style) {
   const system = "You are a professional text summarizer. Respond with only the summary. No preamble, no intro phrases.";
-
   const instructions = {
     short:   "Summarize the following text in 2 to 3 clear concise sentences. Capture only the most essential idea.",
     medium:  "Write a medium-length summary (one paragraph, 5 to 8 sentences) of the following text. Cover main points and key details.",
     bullets: "Summarize the following text as bullet points. Start each bullet with '• '. Include 4 to 7 key takeaways. Each bullet is one sentence.",
   };
-
   return [
     { role: "system", content: system },
     { role: "user",   content: (instructions[style] || instructions.short) + "\n\nText:\n\"\"\"\n" + text + "\n\"\"\"" },
   ];
 }
 
-// ── SHOW STATE (the core fix — only ONE panel visible at a time) ──
 function showState(name) {
   var ids = ["outputIdle", "outputLoading", "outputError", "outputResult"];
   for (var i = 0; i < ids.length; i++) {
@@ -48,84 +41,71 @@ function showState(name) {
   }
 }
 
-// ── BUTTON LOADING STATE ──
 function setButtonLoading(loading) {
-  const text = document.querySelector(".btn-text");
+  const text   = document.querySelector(".btn-text");
   const loader = document.querySelector(".btn-loader");
-
   if (!text || !loader) return;
-
   if (loading) {
-    text.style.display = "none";
+    text.style.display   = "none";
     loader.style.display = "inline-flex";
   } else {
-    text.style.display = "inline";
+    text.style.display   = "inline";
     loader.style.display = "none";
   }
 }
-// ── MAIN HANDLER ──
+
 async function handleSummarize() {
   var userText = inputTextEl.value.trim();
 
-  // EMPTY — show warning below textarea, output stays idle, NO loading
   if (!userText) {
     showWarning("Please paste some text to summarize.");
     return;
-}
-  // TOO SHORT — same, no loading
+  }
   if (userText.length < 50) {
     showWarning("Text is too short — paste at least 50 characters.");
     return;
   }
 
-  // All good — remove any warning and start loading
- removeWarning();
- var style = document.querySelector('input[name="summaryStyle"]:checked').value;
- showState("outputLoading");
- setButtonLoading(true);
+  removeWarning();
+  var style = document.querySelector('input[name="summaryStyle"]:checked').value;
+  showState("outputLoading");
+  setButtonLoading(true);
 
-  try{
-  var summary = await callGroqAPI(userText, style);
+  try {
+    var summary = await callGroqAPI(userText, style);
 
-  const summaryEl = document.getElementById("summaryText");
-  summaryEl.textContent = summary;
-  summaryEl.style.whiteSpace = "pre-wrap";
-  document.getElementById("copyConfirm").hidden = true;
+    const summaryEl = document.getElementById("summaryText");
+    summaryEl.textContent    = summary;
+    summaryEl.style.whiteSpace = "pre-wrap";
+    document.getElementById("copyConfirm").hidden = true;
 
-  setButtonLoading(false);
-  showState("outputResult");
+    setButtonLoading(false);
+    showState("outputResult");
+
+    // ── Hand off to chat system ──
+    // Store original text + summary so chat knows full context
+    initChat(userText, summary);
+
   } catch (err) {
     console.error("Groq error:", err);
-    document.getElementById("errorMessage").textContent = err.message || "API call failed. Check the browser console.";
+    document.getElementById("errorMessage").textContent = err.message || "API call failed.";
     showState("outputError");
   } finally {
     setButtonLoading(false);
   }
 }
 
-// ── GROQ API CALL ──
 async function callGroqAPI(text, style) {
   const res = await fetch("/api/summarize", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      text,
-      style
-    })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, style })
   });
-
   const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.error || "Request failed");
-  }
-
+  if (!res.ok) throw new Error(data.error || "Request failed");
   return data.summary;
 }
 
-// ── INLINE WARNING (below textarea, no output panel change) ──
 function showWarning(msg) {
   removeWarning();
   var div = document.createElement("div");
@@ -144,195 +124,363 @@ function removeWarning() {
   if (el) el.remove();
 }
 
-// ── COPY ──
 async function copyResult() {
   var text = document.getElementById("summaryText").textContent;
   var conf = document.getElementById("copyConfirm");
   try {
     await navigator.clipboard.writeText(text);
     conf.hidden = false;
-    setTimeout(function() { conf.hidden = true; }, 2000);
-  } catch(e) {
+    setTimeout(function () { conf.hidden = true; }, 2000);
+  } catch (e) {
     alert("Copy failed. Select the text manually.");
   }
 }
 
-// ── CLEAR ──
 function clearAll() {
-
-    inputTextEl.value = "";
-
-    charCountEl.textContent = "0";
-
-    if(documentInput){
-
-        documentInput.value = "";
-
-    }
-
-    if(fileName){
-
-        fileName.textContent = "No file selected";
-
-    }
-
-    removeWarning();
-
-    showState("outputIdle");
-
-    setButtonLoading(false);
-
+  inputTextEl.value        = "";
+  charCountEl.textContent  = "0";
+  removeWarning();
+  showState("outputIdle");
+  setButtonLoading(false);
+  // Also hide and reset the chat
+  resetChatState();
 }
 
-// ── KEYBOARD SHORTCUT: Ctrl+Enter / Cmd+Enter ──
-document.addEventListener("keydown", function(e) {
+document.addEventListener("keydown", function (e) {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") handleSummarize();
 });
-// Initial page state
+
 window.addEventListener("DOMContentLoaded", function () {
   showState("outputIdle");
   setButtonLoading(false);
 });
+
+
+// ════════════════════════════════════════════════════════════
+// SECTION 2 — CHAT SYSTEM WITH SESSION MEMORY
+//
+// How memory works:
+//   - chatHistory[] holds every message {role, content}
+//   - On each new user question, we send the FULL history to
+//     the API so the AI remembers previous turns
+//   - The system prompt always includes the original text
+//     AND the summary so the AI knows exactly what the
+//     user is referring to
+//   - All memory lives in JS variables — it automatically
+//     clears when the tab is closed or page is refreshed
+//     (no localStorage, no cookies)
+// ════════════════════════════════════════════════════════════
+
+// In-memory store — cleared automatically on page close
+let chatHistory        = [];   // [{role:"user"|"assistant", content:"..."}]
+let chatOriginalText   = "";   // the full text the user pasted
+let chatSummary        = "";   // the summary that was generated
+
+// DOM refs for chat
+const chatSection  = document.getElementById("chatSection");
+const chatMessages = document.getElementById("chatMessages");
+const chatInput    = document.getElementById("chatInput");
+const chatSendBtn  = document.getElementById("chatSendBtn");
+
+// ── Called by handleSummarize() after a summary is ready ──
+function initChat(originalText, summary) {
+  // Reset memory for the new summary
+  chatHistory      = [];
+  chatOriginalText = originalText;
+  chatSummary      = summary;
+
+  // Clear old messages and show empty state
+  chatMessages.innerHTML = "";
+  appendChatEmpty();
+
+  // Show the chat section (was hidden)
+  chatSection.hidden        = false;
+  chatSection.style.display = "flex";
+
+  // Smooth scroll down to it
+  setTimeout(() => {
+    chatSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 150);
+}
+
+// ── Reset chat without hiding (used by clearAll) ──
+function resetChatState() {
+  chatHistory      = [];
+  chatOriginalText = "";
+  chatSummary      = "";
+  chatMessages.innerHTML = "";
+  chatSection.hidden        = true;
+  chatSection.style.display = "none";
+}
+
+// ── Clear just the chat history but keep the summary context ──
+function clearChat() {
+  chatHistory = [];
+  chatMessages.innerHTML = "";
+  appendChatEmpty();
+  chatInput.focus();
+}
+
+// ── Empty state placeholder ──
+function appendChatEmpty() {
+  chatMessages.innerHTML = `
+    <div class="chat-empty">
+      <div class="chat-empty-icon">💬</div>
+      <p>No messages yet.<br/>Ask anything about the summary above.</p>
+    </div>`;
+}
+
+// ── Send button click ──
+async function sendChatMessage() {
+  const question = chatInput.value.trim();
+  if (!question) return;
+
+  // Remove empty state placeholder if present
+  const emptyEl = chatMessages.querySelector(".chat-empty");
+  if (emptyEl) emptyEl.remove();
+
+  // Clear input and auto-resize
+  chatInput.value = "";
+  autoResizeChatInput();
+
+  // Append user bubble
+  appendMessage("user", question);
+
+  // Disable send while waiting
+  setChatLoading(true);
+
+  // Show typing indicator
+  const typingId = appendTypingIndicator();
+
+  try {
+    // Add user turn to memory
+    chatHistory.push({ role: "user", content: question });
+
+    // Call the chat API with full history
+    const reply = await callChatAPI(chatHistory);
+
+    // Remove typing indicator
+    removeTypingIndicator(typingId);
+
+    // Add AI reply to memory
+    chatHistory.push({ role: "assistant", content: reply });
+
+    // Render AI bubble
+    appendMessage("ai", reply);
+
+  } catch (err) {
+    removeTypingIndicator(typingId);
+    appendMessage("ai", "⚠ Sorry, something went wrong: " + (err.message || "Unknown error. Please try again."));
+    // Remove the failed user turn from history so it doesn't corrupt future turns
+    chatHistory.pop();
+  } finally {
+    setChatLoading(false);
+  }
+}
+
+// ── API call for chat ──
+// Sends: system prompt (with original text + summary) + full conversation history
+async function callChatAPI(history) {
+  // The system prompt gives the AI all the context it needs
+  const systemPrompt =
+    "You are a helpful assistant that answers questions about a specific piece of text and its summary.\n\n" +
+    "ORIGINAL TEXT:\n\"\"\"\n" + chatOriginalText + "\n\"\"\"\n\n" +
+    "SUMMARY THAT WAS GENERATED:\n\"\"\"\n" + chatSummary + "\n\"\"\"\n\n" +
+    "Answer the user's questions based on the original text and summary above. " +
+    "Be concise and accurate. If the question is unrelated to this text, politely say so.";
+
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system: systemPrompt,
+      messages: history          // full history = memory
+    })
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Chat API failed");
+  return data.reply;
+}
+
+// ── Render a message bubble ──
+function appendMessage(role, text) {
+  const isUser  = role === "user";
+  const avatar  = isUser ? "You" : "✦";
+  const msgDiv  = document.createElement("div");
+  msgDiv.className = `chat-msg ${role}`;
+  msgDiv.innerHTML = `
+    <div class="chat-msg-avatar">${avatar}</div>
+    <div class="chat-msg-bubble">${escapeHTML(text)}</div>`;
+  chatMessages.appendChild(msgDiv);
+  scrollChatToBottom();
+}
+
+// ── Typing indicator (3 bouncing dots) ──
+function appendTypingIndicator() {
+  const id     = "typing-" + Date.now();
+  const msgDiv = document.createElement("div");
+  msgDiv.className = "chat-msg ai typing";
+  msgDiv.id        = id;
+  msgDiv.innerHTML = `
+    <div class="chat-msg-avatar">✦</div>
+    <div class="chat-msg-bubble">
+      <div class="typing-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>`;
+  chatMessages.appendChild(msgDiv);
+  scrollChatToBottom();
+  return id;
+}
+
+function removeTypingIndicator(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+// ── Disable/enable send button ──
+function setChatLoading(loading) {
+  chatSendBtn.disabled = loading;
+  document.getElementById("chatBtnText").hidden   = loading;
+  document.getElementById("chatBtnLoader").hidden = !loading;
+}
+
+// ── Keep chat scrolled to latest message ──
+function scrollChatToBottom() {
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// ── Prevent XSS: escape user-typed text before inserting as HTML ──
+function escapeHTML(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/\n/g, "<br>");
+}
+
+// ── Auto-resize chat textarea as user types ──
+function autoResizeChatInput() {
+  chatInput.style.height = "auto";
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + "px";
+}
+
+chatInput.addEventListener("input", autoResizeChatInput);
+
+// Enter sends, Shift+Enter adds new line
+chatInput.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+});
+
+
+// ════════════════════════════════════════
+// SECTION 3 — DOWNLOAD FUNCTIONS
+// ════════════════════════════════════════
+
 // ── DOWNLOAD AS REAL PDF (jsPDF) ──
 function downloadAsPDF() {
   const text = document.getElementById("summaryText").textContent;
   if (!text) return;
 
-  // Show a brief loading state on the button
-  const pdfBtn = document.querySelector('.btn-download');
-  pdfBtn.textContent = 'Generating…';
-  pdfBtn.disabled = true;
+  const pdfBtns = document.querySelectorAll('.btn-download');
+  pdfBtns.forEach(b => { if (b.textContent.includes('PDF')) { b.textContent = 'Generating…'; b.disabled = true; } });
 
-  // Load jsPDF from CDN if not already loaded
   if (window.jspdf) {
-    generatePDF(text, pdfBtn);
+    generatePDF(text, pdfBtns);
     return;
   }
 
-  const script = document.createElement('script');
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  const script   = document.createElement('script');
+  script.src     = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
   document.head.appendChild(script);
-
-  script.onload = () => generatePDF(text, pdfBtn);
-
+  script.onload  = () => generatePDF(text, pdfBtns);
   script.onerror = () => {
-    pdfBtn.textContent = '↓ PDF';
-    pdfBtn.disabled = false;
+    pdfBtns.forEach(b => { b.textContent = '↓ PDF'; b.disabled = false; });
     alert('Failed to load PDF library. Check your internet connection.');
   };
 }
 
-function generatePDF(text, btn) {
+function generatePDF(text, btns) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4'
-  });
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  const pageWidth   = doc.internal.pageSize.getWidth();
-  const pageHeight  = doc.internal.pageSize.getHeight();
-  const marginLeft  = 20;
-  const marginTop   = 20;
-  const marginRight = 20;
-  const maxWidth    = pageWidth - marginLeft - marginRight;
-  let cursorY       = marginTop;
+  const pageWidth  = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginL    = 20, marginT = 20, marginR = 20;
+  const maxWidth   = pageWidth - marginL - marginR;
+  let   cursorY    = marginT;
 
-  // ── Header bar ──
-  doc.setFillColor(124, 92, 252);           // violet accent
+  doc.setFillColor(124, 92, 252);
   doc.rect(0, 0, pageWidth, 14, 'F');
-
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(255, 255, 255);
-  doc.text('SummarAI', marginLeft, 9.5);
+  doc.text('SummarAI', marginL, 9.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('Smart Text Summarizer', pageWidth - marginRight, 9.5, { align: 'right' });
+  doc.text('Smart Text Summarizer', pageWidth - marginR, 9.5, { align: 'right' });
 
   cursorY = 28;
-
-  // ── Title ──
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(20, 20, 40);
-  doc.text('Summary', marginLeft, cursorY);
+  doc.text('Summary', marginL, cursorY);
   cursorY += 7;
 
-  // ── Date line ──
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(140, 140, 160);
-  const dateStr = new Date().toLocaleDateString('en-IN', {
-    year: 'numeric', month: 'long', day: 'numeric'
-  });
-  doc.text(`Generated on ${dateStr}`, marginLeft, cursorY);
+  const dateStr = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+  doc.text(`Generated on ${dateStr}`, marginL, cursorY);
   cursorY += 3;
 
-  // ── Divider ──
   doc.setDrawColor(220, 220, 235);
   doc.setLineWidth(0.4);
-  doc.line(marginLeft, cursorY + 1, pageWidth - marginRight, cursorY + 1);
+  doc.line(marginL, cursorY + 1, pageWidth - marginR, cursorY + 1);
   cursorY += 10;
 
-  // ── Body text ──
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(30, 30, 50);
 
-  const lines = text.split('\n').filter(l => l.trim());
+  const lines     = text.split('\n').filter(l => l.trim());
   const isBullets = lines.some(l => l.trim().startsWith('•'));
 
   for (const line of lines) {
-    const cleanLine = line.replace(/^•\s*/, '').trim();
-    const prefix    = isBullets ? '•  ' : '';
+    const cleanLine   = line.replace(/^•\s*/, '').trim();
+    const blockHeight = 7 * doc.splitTextToSize((isBullets ? '•  ' : '') + cleanLine, maxWidth).length;
 
-    // Word-wrap the line to fit page width
-    const wrapped = doc.splitTextToSize(prefix + cleanLine, maxWidth);
+    if (cursorY + blockHeight > pageHeight - 20) { doc.addPage(); cursorY = marginT; }
 
-    // Check if we need a new page
-    const blockHeight = wrapped.length * 7;
-    if (cursorY + blockHeight > pageHeight - 20) {
-      doc.addPage();
-      cursorY = marginTop;
-    }
-
-    // Draw bullet dot in accent color
     if (isBullets) {
       doc.setTextColor(124, 92, 252);
-      doc.text('•', marginLeft, cursorY);
+      doc.text('•', marginL, cursorY);
       doc.setTextColor(30, 30, 50);
-      // Indent the text after the bullet
-      const indentedLines = doc.splitTextToSize(cleanLine, maxWidth - 6);
-      doc.text(indentedLines, marginLeft + 6, cursorY);
-      cursorY += indentedLines.length * 7 + 3;
+      const wrapped = doc.splitTextToSize(cleanLine, maxWidth - 6);
+      doc.text(wrapped, marginL + 6, cursorY);
+      cursorY += wrapped.length * 7 + 3;
     } else {
-      doc.text(wrapped, marginLeft, cursorY);
+      const wrapped = doc.splitTextToSize(cleanLine, maxWidth);
+      doc.text(wrapped, marginL, cursorY);
       cursorY += wrapped.length * 7 + 4;
     }
   }
 
-  // ── Footer on every page ──
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(180, 180, 200);
-    doc.text(
-      `Page ${i} of ${totalPages}`,
-      pageWidth / 2,
-      pageHeight - 10,
-      { align: 'center' }
-    );
-    doc.text('Generated by SummarAI', marginLeft, pageHeight - 10);
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text('Generated by SummarAI', marginL, pageHeight - 10);
   }
 
-  // ── Save ──
   doc.save('summary.pdf');
-
-  // Reset button
-  btn.textContent = '↓ PDF';
-  btn.disabled = false;
+  btns.forEach(b => { b.textContent = '↓ PDF'; b.disabled = false; });
 }
 
 // ── DOWNLOAD AS WORD (.docx) ──
@@ -340,41 +488,33 @@ function downloadAsWord() {
   const text = document.getElementById("summaryText").textContent;
   if (!text) return;
 
-  // Load docx library from CDN on demand
-  const script = document.createElement("script");
-  script.src = "https://unpkg.com/docx@8.5.0/build/index.umd.js";
+  const script = document.createElement('script');
+  script.src   = 'https://unpkg.com/docx@8.5.0/build/index.umd.js';
   document.head.appendChild(script);
 
   script.onload = () => {
     const { Document, Paragraph, TextRun, HeadingLevel, Packer } = docx;
-
-    const lines = text.split("\n").filter(l => l.trim());
+    const lines     = text.split('\n').filter(l => l.trim());
+    const isBullets = lines.some(l => l.trim().startsWith('•'));
 
     const contentParagraphs = lines.map(line => {
-      const isBullet = line.trim().startsWith("•");
-      const cleanLine = line.replace(/^•\s*/, "").trim();
+      const isBullet  = line.trim().startsWith('•');
+      const cleanLine = line.replace(/^•\s*/, '').trim();
       return new Paragraph({
-        children: [new TextRun({ text: cleanLine, size: 24, font: "Georgia" })],
-        bullet: isBullet ? { level: 0 } : undefined,
-        spacing: { after: 160 }
+        children: [new TextRun({ text: cleanLine, size: 24, font: 'Georgia' })],
+        bullet:   isBullet ? { level: 0 } : undefined,
+        spacing:  { after: 160 }
       });
     });
 
     const doc = new Document({
       sections: [{
         children: [
-          new Paragraph({
-            text: "SummarAI – Summary",
-            heading: HeadingLevel.HEADING_1,
-            spacing: { after: 120 }
-          }),
+          new Paragraph({ text: 'SummarAI – Summary', heading: HeadingLevel.HEADING_1, spacing: { after: 120 } }),
           new Paragraph({
             children: [new TextRun({
-              text: `Generated on ${new Date().toLocaleDateString("en-IN", {
-                year: "numeric", month: "long", day: "numeric"
-              })}`,
-              color: "888888",
-              size: 20
+              text: `Generated on ${new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+              color: '888888', size: 20
             })],
             spacing: { after: 320 }
           }),
@@ -384,136 +524,21 @@ function downloadAsWord() {
     });
 
     Packer.toBlob(doc).then(blob => {
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement("a");
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
       a.href     = url;
-      a.download = "summary.docx";
+      a.download = 'summary.docx';
       a.click();
       URL.revokeObjectURL(url);
     });
   };
 }
 
-// ── HELPER: plain text → HTML for PDF ──
 function formatForHTML(text) {
-  const lines = text.split("\n").filter(l => l.trim());
-  const isBullets = lines.some(l => l.trim().startsWith("•"));
-
+  const lines     = text.split('\n').filter(l => l.trim());
+  const isBullets = lines.some(l => l.trim().startsWith('•'));
   if (isBullets) {
-    const items = lines.map(l => `<li>${l.replace(/^•\s*/, "")}</li>`).join("");
-    return `<ul>${items}</ul>`;
+    return '<ul>' + lines.map(l => `<li>${l.replace(/^•\s*/, '')}</li>`).join('') + '</ul>';
   }
-  return lines.map(l => `<p>${l}</p>`).join("");
-}
-async function uploadDocument(event) {
-
-    const file = event.target.files[0];
-
-    if (!file) return;
-
-    fileName.textContent = file.name;
-
-    const extension = file.name.split(".").pop().toLowerCase();
-
-    try {
-
-        if (extension === "txt") {
-
-            await readTXT(file);
-
-        }
-
-        else if (extension === "pdf") {
-
-            await readPDF(file);
-
-        }
-
-        else if (extension === "docx") {
-
-            await readDOCX(file);
-
-        }
-
-        else {
-
-            alert("Unsupported file.");
-
-        }
-
-    }
-
-    catch (error) {
-
-        console.error(error);
-
-        alert("Unable to read this document.");
-
-    }
-
-}
-async function readTXT(file) {
-
-    const text = await file.text();
-
-    inputTextEl.value = text;
-
-    charCountEl.textContent = text.length;
-
-}
-async function readDOCX(file) {
-
-    if (!window.mammoth) {
-
-        throw new Error("Mammoth library missing.");
-
-    }
-
-    const buffer = await file.arrayBuffer();
-
-    const result = await mammoth.extractRawText({
-
-        arrayBuffer: buffer
-
-    });
-
-    inputTextEl.value = result.value;
-
-    charCountEl.textContent = result.value.length;
-
-}
-async function readPDF(file) {
-
-    if (!window.pdfjsLib) {
-
-        throw new Error("PDF.js library missing.");
-
-    }
-
-    const buffer = await file.arrayBuffer();
-
-    const pdf = await pdfjsLib.getDocument({
-
-        data: buffer
-
-    }).promise;
-
-    let text = "";
-
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-
-        const page = await pdf.getPage(pageNumber);
-
-        const content = await page.getTextContent();
-
-        const pageText = content.items.map(item => item.str).join(" ");
-
-        text += pageText + "\n";
-
-    }
-
-    inputTextEl.value = text;
-
-    charCountEl.textContent = text.length;
-
+  return lines.map(l => `<p>${l}</p>`).join('');
 }
