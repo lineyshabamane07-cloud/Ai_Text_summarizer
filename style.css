@@ -486,3 +486,52 @@ body {
   border-color: var(--accent);
   color: var(--accent-hover);
 }
+/* ==========================
+   Upload Button
+========================== */
+
+.upload-container{
+
+display:flex;
+align-items:center;
+gap:15px;
+margin-top:18px;
+
+}
+
+.btn-upload{
+
+background:#5d5fef;
+color:white;
+
+border:none;
+
+padding:12px 18px;
+
+border-radius:10px;
+
+cursor:pointer;
+
+font-weight:600;
+
+transition:.3s;
+
+}
+
+.btn-upload:hover{
+
+background:#4346d4;
+
+transform:translateY(-2px);
+
+}
+
+.file-name{
+
+font-size:14px;
+
+color:#bdbdbd;
+
+word-break:break-all;
+
+}
