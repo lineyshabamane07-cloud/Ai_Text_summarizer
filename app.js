@@ -8,10 +8,17 @@ const API_URL = "/api/summarize";
 // ── CHARACTER COUNTER ──
 const inputTextEl = document.getElementById("inputText");
 const charCountEl = document.getElementById("charCount");
+// Upload Elements
+const documentInput = document.getElementById("documentInput");
+const fileName = document.getElementById("fileName");
 
 inputTextEl.addEventListener("input", function () {
   charCountEl.textContent = inputTextEl.value.length;
 });
+// Upload Listener
+if (documentInput) {
+  documentInput.addEventListener("change", uploadDocument);
+}
 
 // ── BUILD PROMPT ──
 function buildMessages(text, style) {
@@ -152,11 +159,29 @@ async function copyResult() {
 
 // ── CLEAR ──
 function clearAll() {
-  inputTextEl.value = "";
-  charCountEl.textContent = "0";
-  removeWarning();
+
+    inputTextEl.value = "";
+
+    charCountEl.textContent = "0";
+
+    if(documentInput){
+
+        documentInput.value = "";
+
+    }
+
+    if(fileName){
+
+        fileName.textContent = "No file selected";
+
+    }
+
+    removeWarning();
+
     showState("outputIdle");
+
     setButtonLoading(false);
+
 }
 
 // ── KEYBOARD SHORTCUT: Ctrl+Enter / Cmd+Enter ──
@@ -379,4 +404,116 @@ function formatForHTML(text) {
     return `<ul>${items}</ul>`;
   }
   return lines.map(l => `<p>${l}</p>`).join("");
+}
+async function uploadDocument(event) {
+
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    fileName.textContent = file.name;
+
+    const extension = file.name.split(".").pop().toLowerCase();
+
+    try {
+
+        if (extension === "txt") {
+
+            await readTXT(file);
+
+        }
+
+        else if (extension === "pdf") {
+
+            await readPDF(file);
+
+        }
+
+        else if (extension === "docx") {
+
+            await readDOCX(file);
+
+        }
+
+        else {
+
+            alert("Unsupported file.");
+
+        }
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        alert("Unable to read this document.");
+
+    }
+
+}
+async function readTXT(file) {
+
+    const text = await file.text();
+
+    inputTextEl.value = text;
+
+    charCountEl.textContent = text.length;
+
+}
+async function readDOCX(file) {
+
+    if (!window.mammoth) {
+
+        throw new Error("Mammoth library missing.");
+
+    }
+
+    const buffer = await file.arrayBuffer();
+
+    const result = await mammoth.extractRawText({
+
+        arrayBuffer: buffer
+
+    });
+
+    inputTextEl.value = result.value;
+
+    charCountEl.textContent = result.value.length;
+
+}
+async function readPDF(file) {
+
+    if (!window.pdfjsLib) {
+
+        throw new Error("PDF.js library missing.");
+
+    }
+
+    const buffer = await file.arrayBuffer();
+
+    const pdf = await pdfjsLib.getDocument({
+
+        data: buffer
+
+    }).promise;
+
+    let text = "";
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+
+        const page = await pdf.getPage(pageNumber);
+
+        const content = await page.getTextContent();
+
+        const pageText = content.items.map(item => item.str).join(" ");
+
+        text += pageText + "\n";
+
+    }
+
+    inputTextEl.value = text;
+
+    charCountEl.textContent = text.length;
+
 }
