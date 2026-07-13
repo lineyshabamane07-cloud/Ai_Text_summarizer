@@ -1,41 +1,62 @@
-// ═══════════════════════════════════════════════════════════
-// ADD THIS ROUTE TO YOUR EXISTING server.js
-// Paste it right after your existing /api/summarize route
-// ═══════════════════════════════════════════════════════════
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-app.post('/api/chat', async (req, res) => {
   try {
     const { system, messages } = req.body;
 
-    // messages = full conversation history sent from the browser
-    // system   = context prompt containing original text + summary
+    // Build messages array the way Groq expects it:
+    // system message first, then the conversation history
+    const groqMessages = [
+      { role: 'system', content: system },
+      ...messages
+    ];
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': 'sk-ant-YOUR_KEY_HERE',   // ← same key as your summarize route
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'llama3-8b-8192',   // same model your summarize.js likely uses
         max_tokens: 1024,
-        system: system,        // context: original text + summary
-        messages: messages     // full chat history = memory
+        messages: groqMessages
       })
     });
 
-    const data = await response.json();
+    // Read raw text first — helps debug if Groq sends back an unexpected response
+    const rawText = await response.text();
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || 'API error' });
+    // Guard against empty response body
+    if (!rawText || rawText.trim() === '') {
+      return res.status(500).json({ error: 'Empty response from Groq API' });
     }
 
-    const reply = data.content?.[0]?.text || '';
-    res.json({ reply });
+    // Now safely parse
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.error('Groq raw response:', rawText);
+      return res.status(500).json({ error: 'Invalid JSON from Groq: ' + rawText.slice(0, 200) });
+    }
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data.error?.message || 'Groq API error' });
+    }
+
+    const reply = data.choices?.[0]?.message?.content || '';
+
+    if (!reply) {
+      return res.status(500).json({ error: 'No reply content in Groq response' });
+    }
+
+    res.status(200).json({ reply });
 
   } catch (err) {
-    console.error('Chat route error:', err);
+    console.error('Chat handler error:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}
